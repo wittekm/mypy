@@ -31,7 +31,7 @@ from mypy.nodes import (
 )
 from mypy import defaults
 from mypy import nodes
-from mypy.errors import Errors, CompileError
+from mypy.errors import Errors, CompileError, Severity
 from mypy.types import Type, CallableType, AnyType, UnboundType
 from mypy.parsetype import (
     parse_type, parse_types, parse_signature, TypeParseError, parse_str_as_signature
@@ -1907,7 +1907,7 @@ class Parser:
             raise ParseError()
         return typ
 
-    annotation_prefix_re = re.compile(r'#\s*type:')
+    annotation_prefix_re = re.compile(r'#\s*type(?P<maybe_colon>:?)')
     ignore_prefix_re = re.compile(r'ignore\b')
 
     def parse_type_comment(self, token: Token, signature: bool) -> Type:
@@ -1917,7 +1917,17 @@ class Parser:
         a type signature of form (...) -> t.
         """
         whitespace_or_comments = token.rep().strip()
-        if self.annotation_prefix_re.match(whitespace_or_comments):
+        type_annotation_match = self.annotation_prefix_re.match(whitespace_or_comments)
+        if type_annotation_match:
+            # Warn when somebody does "# type" without a following colon
+            maybe_colon = type_annotation_match.group('maybe_colon')
+            if not maybe_colon:
+                self.errors.report(
+                    token.line,
+                    "Possible typo; you're missing a `:` after `# type`",
+                    severity=Severity.WARNING
+                )
+                return None
             type_as_str = whitespace_or_comments.split(':', 1)[1].strip()
             if self.ignore_prefix_re.match(type_as_str):
                 # Actually a "# type: ignore" annotation -> not a type.

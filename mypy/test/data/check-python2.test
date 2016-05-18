@@ -201,3 +201,11 @@ def bar(key: Callable[[Tuple[int, int]], int]) -> int:
 def foo() -> int:
     return bar(key=lambda (a, b): a)
 [out]
+
+[case testWarningForTypeAnnotationWithoutColon]
+def f(x): # type (int) -> str
+    pass
+[out]
+main: note: In function "f":
+main:1: warning: Possible typo; you're missing a `:` after `# type`
+
